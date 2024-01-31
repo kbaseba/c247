@@ -40,8 +40,25 @@ class Softmax(object):
     #   set margins, and then normalize the loss by the number of 
     #   training examples.)
     # ================================================================ #
-    pass
     
+    shape = X.shape
+    N = shape[0]
+
+    for i in range(N):
+      # Calculate score
+      scores = X[i].dot(self.W.T)
+      scores -= np.max(scores)
+      
+      # Softmax probabilities Computation
+      softmax_probs = np.exp(scores) / np.sum(np.exp(scores))
+    
+      # Calculate the loss for the correct class
+      correct_class = y[i]
+      loss += -np.log(softmax_probs[correct_class])
+
+    # Normalize the loss by the number of training examples
+    loss /= N
+
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -65,7 +82,33 @@ class Softmax(object):
     #   Calculate the softmax loss and the gradient. Store the gradient
     #   as the variable grad.
     # ================================================================ #
-    pass
+    
+    shape = X.shape
+    N = shape[0]
+
+    w_shape = self.W.shape
+    K = w_shape[0]
+
+    for i in range(N):
+      # Calculate score
+      scores = X[i].dot(self.W.T)
+      scores -= np.max(scores)
+      
+      # Softmax probabilities Computation
+      softmax_probs = np.exp(scores) / np.sum(np.exp(scores))
+    
+      # Calculate the loss for the correct class
+      correct_class = y[i]
+      loss += -np.log(softmax_probs[correct_class])
+
+      # Gradient computation
+      softmax_probs[correct_class] = (softmax_probs[correct_class] - 1)
+      for j in range(K):
+        grad[j, :] += softmax_probs[j] * X[i]
+
+    # Normalize the loss by the number of training examples
+    loss /= N
+    grad /= N
     
     # ================================================================ #
     # END YOUR CODE HERE
@@ -106,7 +149,23 @@ class Softmax(object):
     # YOUR CODE HERE:
     #   Calculate the softmax loss and gradient WITHOUT any for loops.
     # ================================================================ #
-    pass
+    
+    shape = X.shape
+    N = shape[0]
+
+    # Calculate scores
+    scores = X.dot(self.W.T)
+    scores -= np.max(scores, axis=1, keepdims=True)
+
+    # Calculate softmax prob.
+    softmax_probs = np.exp(scores) / np.sum(np.exp(scores), axis=1, keepdims=True)
+
+    # Loss calculation
+    loss = (-np.sum(np.log(softmax_probs[np.arange(N), y])) / N)
+
+    # Gradien computation
+    softmax_probs[np.arange(N), y] = (softmax_probs[np.arange(N), y] - 1)
+    grad = (softmax_probs.T.dot(X) / N)
     
     # ================================================================ #
     # END YOUR CODE HERE
@@ -154,7 +213,14 @@ class Softmax(object):
       #   in the dataset.  Use np.random.choice.  It's okay to sample with
       #   replacement.
       # ================================================================ #
-      pass
+      
+      shape = X.shape
+      N = shape[0]
+
+      index = np.random.choice(N, batch_size)
+      X_batch = X[index]
+      y_batch = y[index]
+
       # ================================================================ #
       # END YOUR CODE HERE
       # ================================================================ #
@@ -167,7 +233,8 @@ class Softmax(object):
       # YOUR CODE HERE:
       #   Update the parameters, self.W, with a gradient step 
       # ================================================================ #
-      pass
+      
+      self.W = self.W - (grad * learning_rate)
 
       # ================================================================ #
       # END YOUR CODE HERE
@@ -193,7 +260,10 @@ class Softmax(object):
     # YOUR CODE HERE:
     #   Predict the labels given the training data.
     # ================================================================ #
-    pass
+    
+    scores = X.dot(self.W.T)
+    y_pred = np.argmax(scores, axis=1)
+
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
