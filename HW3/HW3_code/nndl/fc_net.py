@@ -47,7 +47,10 @@ class TwoLayerNet(object):
     #   dimensions of W2 should be (hidden_dims, num_classes)
     # ================================================================ #
 
-    pass
+    self.params['W1'] = np.random.normal(scale=weight_scale, size=(input_dim, hidden_dims))
+    self.params['b1'] = np.zeros(hidden_dims)
+    self.params['W2'] = np.random.normal(scale=weight_scale, size=(hidden_dims, num_classes))
+    self.params['b2'] = np.zeros(num_classes)
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -81,7 +84,9 @@ class TwoLayerNet(object):
     #   you prior implemented.
     # ================================================================ #    
     
-    pass
+    scores, cache_hidden = affine_relu_forward(X.reshape(X.shape[0], -1), self.params['W1'], self.params['b1'])
+    scores, cache_scores = affine_forward(scores, self.params['W2'], self.params['b2'])
+
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -106,7 +111,20 @@ class TwoLayerNet(object):
     #   And be sure to use the layers you prior implemented.
     # ================================================================ #    
     
-    pass
+    loss, dscores = softmax_loss(scores, y)
+    loss += 0.5 * self.reg * (np.sum(self.params['W1'] ** 2) + np.sum(self.params['W2'] ** 2))
+
+    # Compute gradients for the second layer
+    dH2, grads_W2, grads_b2 = affine_backward(dscores, cache_scores)
+    reg_W2 = self.reg * self.params['W2']
+    grads['W2'] = grads_W2 + reg_W2
+    grads['b2'] = grads_b2
+
+    # Compute gradients for the first layer
+    dX1, grads_W1, grads_b1 = affine_relu_backward(dH2, cache_hidden)
+    reg_W1 = self.reg * self.params['W1']
+    grads['W1'] = grads_W1 + reg_W1
+    grads['b1'] = grads_b1
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -170,7 +188,11 @@ class FullyConnectedNet(object):
     #   so that each parameter has mean 0 and standard deviation weight_scale.
     # ================================================================ #
     
-    pass
+    layer_dims = [input_dim] + hidden_dims + [num_classes]
+
+    for i in range(self.num_layers):
+      self.params["W{}".format(i + 1)] = weight_scale * np.random.randn(layer_dims[i], layer_dims[i + 1])
+      self.params["b{}".format(i + 1)] = np.zeros(layer_dims[i + 1])
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -224,7 +246,18 @@ class FullyConnectedNet(object):
     #   scores as the variable "scores".
     # ================================================================ #
 
-    pass
+    caches = {}
+
+    for i in range(1, self.num_layers + 1):
+      W = self.params[f"W{i}"]
+      b = self.params[f"b{i}"]
+      
+      # Forward pass through layers with ReLU activation
+      X, cache = affine_relu_forward(X, W, b) if i < self.num_layers else affine_forward(X, W, b)
+      
+      caches[i] = cache
+
+    scores = X
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -242,7 +275,23 @@ class FullyConnectedNet(object):
     #   Be sure your L2 regularization includes a 0.5 factor.
     # ================================================================ #
 
-    pass
+    # Compute the softmax loss and its gradient
+    loss, dout = softmax_loss(scores, y)
+
+    # Add regularization to the loss more efficiently
+    weights_squared_sum = sum(np.sum(self.params['W' + str(i + 1)] ** 2) for i in range(self.num_layers))
+    loss += 0.5 * self.reg * weights_squared_sum
+
+    # Backward pass for the last layer
+    dout, grads['W' + str(self.num_layers)], grads['b' + str(self.num_layers)] = affine_backward(dout, caches[self.num_layers])
+    grads['W' + str(self.num_layers)] += self.reg * self.params['W' + str(self.num_layers)]
+
+    # Iterate over layers in reverse for backprop, skipping the last since it's already handled
+    for i in range(self.num_layers - 1, 0, -1):
+      dout, dW, db = affine_relu_backward(dout, caches[i])
+      grads['W' + str(i)] = dW + self.reg * self.params['W' + str(i)]
+      grads['b' + str(i)] = db
+
 
     # ================================================================ #
     # END YOUR CODE HERE
