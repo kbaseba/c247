@@ -201,8 +201,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # ================================================================ #
 
     # compute the mean and covariance from minibatch examples x
-    mu = np.mean(x, axis=0)
-    var = np.var(x)
+    mu = x.mean(axis=0)
+    var = x.var(axis=0)
 
     # keep an exponentially decaying running mean and variance
     # these averages are used to normalize data at test-time
@@ -211,13 +211,14 @@ def batchnorm_forward(x, gamma, beta, bn_param):
 
     # normalize the activations x with the current mean and variance
     # subtract the mean and divide by the variance
-    xn = (x - mu)/(np.sqrt(var + eps))
+    xc = x - mu
+    xn = (xc)/(np.sqrt(var + eps))
 
     # scale and shift the normalized activations
     out = (gamma * xn) + beta
 
     # store variables you need for the backward pass in the 'cache' variable
-    cache = [mu, var, xn, x, gamma, beta, eps]
+    cache = [eps, mu, var, gamma, beta, x, xc, xn]
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -277,6 +278,33 @@ def batchnorm_backward(dout, cache):
   #   Implement the batchnorm backward pass, calculating dx, dgamma, and dbeta.
   # ================================================================ #
 
+  
+  # first pull out relevant variables
+  eps, mu, var, gamma, beta, x, xc, xn = cache
+  N, D = dout.shape
+
+  # the easy ones: dbeta, dgamma
+  dbeta = np.sum(dout, axis=0)
+  dgamma = np.sum(dout * xn, axis=0)
+
+  # the hard one: dx
+  dxn = dout * gamma
+
+  # intermediate variables
+  sqrtvar = np.sqrt(var + eps)
+  ivar = 1 / sqrtvar
+
+  # intermediate steps for dvar
+  dvar = np.sum(dxn * xc, axis=0) * (-0.5) * np.power(sqrtvar, -3)
+
+  # intermediate steps for dmu
+  # dmu = -np.sum(dxn * ivar, axis=0) + dvar * np.sum(-2. * xc, axis=0) / N
+  dmu = -ivar * np.sum(dxn, axis=0) - (2.0 * dvar / N) * np.sum(xc, axis=0)
+
+  # final step for dx
+  # dx = (dxn * ivar) + (dvar * 2 * xc / N) + (dmu / N)
+  dx = (ivar * dxn) + (dmu * np.ones_like(dout) / N) + (2.0 * xc / N) * dvar
+
   # ================================================================ #
   # END YOUR CODE HERE
   # ================================================================ #
@@ -317,7 +345,8 @@ def dropout_forward(x, dropout_param):
     #   dropout mask as the variable mask.
     # ================================================================ #
 
-    pass
+    mask = (np.random.rand(*x.shape) < p) / p
+    out = x * mask
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -330,7 +359,7 @@ def dropout_forward(x, dropout_param):
     #   Implement the inverted dropout forward pass during test time.
     # ================================================================ #
     
-    pass
+    out = x
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -359,7 +388,7 @@ def dropout_backward(dout, cache):
     #   Implement the inverted dropout backward pass during training time.
     # ================================================================ #
 
-    pass
+    dx = dout * mask
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -370,7 +399,7 @@ def dropout_backward(dout, cache):
     #   Implement the inverted dropout backward pass during test time.
     # ================================================================ #
     
-    pass
+    dx = dout
 
     # ================================================================ #
     # END YOUR CODE HERE

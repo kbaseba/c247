@@ -182,6 +182,12 @@ class FullyConnectedNet(object):
       self.params["W{}".format(i + 1)] = weight_scale * np.random.randn(layer_dims[i], layer_dims[i + 1])
       self.params["b{}".format(i + 1)] = np.zeros(layer_dims[i + 1])
 
+    # Batchnorm
+    if self.use_batchnorm:
+      for i in range(self.num_layers - 1):
+        self.params["gamma{}".format(i + 1)] = np.ones(layer_dims[i + 1])
+        self.params["beta{}".format(i + 1)] = np.zeros(layer_dims[i + 1])
+
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -236,16 +242,26 @@ class FullyConnectedNet(object):
 
     caches = {}
 
-    for i in range(1, self.num_layers + 1):
+    for i in range(1, self.num_layers):
       W = self.params[f"W{i}"]
       b = self.params[f"b{i}"]
       
-      # Forward pass through layers with ReLU activation
-      X, cache = affine_relu_forward(X, W, b) if i < self.num_layers else affine_forward(X, W, b)
+      if self.use_batchnorm:
+        gamma = self.params[f"gamma{i}"]
+        beta = self.params[f"beta{i}"]
+        X, cache = bn_affine_relu_forward(X, W, b, gamma, beta, self.bn_params[i - 1])
+      else:
+        X, cache = affine_relu_forward(X, W, b)
       
       caches[i] = cache
 
-    scores = X
+      if self.use_dropout:
+        X, cache = dropout_forward(X, self.dropout_param)
+        caches[f"dropout{i}"] = cache
+
+    W, b = self.params[f"W{self.num_layers}"], self.params[f"b{self.num_layers}"]
+    scores, cache = affine_forward(X, W, b)
+    caches[self.num_layers] = cache
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -276,10 +292,19 @@ class FullyConnectedNet(object):
 
     # Iterate over layers in reverse for backprop, skipping the last since it's already handled
     for i in range(self.num_layers - 1, 0, -1):
-      dout, dW, db = affine_relu_backward(dout, caches[i])
-      grads['W' + str(i)] = dW + self.reg * self.params['W' + str(i)]
-      grads['b' + str(i)] = db
+      if self.use_dropout:
+        dout = dropout_backward(dout, caches[f'dropout{i}']) # dropout
 
+      if self.use_batchnorm:
+        dout, dw, db, dgamma, dbeta = bn_affine_relu_backward(dout, caches[i])
+        grads[f"gamma{i}"] = dgamma
+        grads[f"beta{i}"] = dbeta
+      else:
+        dout, dw, db = affine_relu_backward(dout, caches[i])
+      
+      W = self.params[f"W{i}"]
+      grads[f"W{i}"] = dw + self.reg * W
+      grads[f"b{i}"] = db
 
     # ================================================================ #
     # END YOUR CODE HERE
